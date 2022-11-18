@@ -13,6 +13,25 @@ const { DISCORD_TOKEN, VIDEO_CHANNEL_ID } = process.env;
 const client = new Client({ intents: [GatewayIntentBits.GuildMessages] });
 let CHANNEL;
 
+/**
+ *
+ * @param {string} str
+ * @returns
+ */
+function parseNumberString(str) {
+  const lastCharactor = str[str.length - 1];
+  str = str.slice(0, -1);
+  if (lastCharactor === "K") {
+    return parseInt(str) * 1000;
+  } else if (lastCharactor === "M") {
+    return parseInt(str) * 1000000;
+  } else if (lastCharactor === "B") {
+    return parseInt(str) * 1000000000;
+  } else {
+    return parseInt(str);
+  }
+}
+
 test.beforeAll(async () => {
   console.log("Logging into Discord...");
   await client.login(DISCORD_TOKEN);
@@ -32,11 +51,13 @@ for (const username of Object.keys(users)) {
 
     await page.locator("[data-e2e=followers-count]").waitFor();
     const followerCount = await page.$("[data-e2e=followers-count]");
-    users[username].followers = await followerCount.innerText();
+    users[username].followers = parseNumberString(
+      await followerCount.innerText()
+    );
 
     await page.locator("[data-e2e=likes-count]").waitFor();
     const likeCount = await page.$("[data-e2e=likes-count]");
-    users[username].likes = await likeCount.innerText();
+    users[username].likes = parseNumberString(await likeCount.innerText());
 
     await page
       .locator("[data-e2e=user-post-item]")
@@ -53,15 +74,15 @@ for (const username of Object.keys(users)) {
       if (!newestVideoId) {
         newestVideoId = videoId;
       }
-      
+
       const videoViews = await videoItem.$("[data-e2e=video-views]");
-      const views = await videoViews.innerText();
+      const views = parseNumberString(await videoViews.innerText());
       if (videos[username][videoId]) {
         console.log("Video is not new: " + videoId);
         videos[username][videoId].views = views;
         continue;
       } else {
-        videos[username][videoId] = {views: views};
+        videos[username][videoId] = { views: views };
       }
       console.log("Posting new video: " + videoId);
 
