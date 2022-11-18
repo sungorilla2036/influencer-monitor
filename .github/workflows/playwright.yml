@@ -31,11 +31,11 @@ jobs:
         VIDEO_CHANNEL_ID: ${{secrets.VIDEO_CHANNEL_ID}}
       run: npx playwright test get-videos-for-users.spec.js
     - name: Add and commit changes to users.json and videos.json
-        continue-on-error: true
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add users.json
-          git add videos.json
-          git commit -m "Update data"
-          git push
+      continue-on-error: true
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add users.json
+        git add videos.json
+        git commit -m "Update data"
+        git push
