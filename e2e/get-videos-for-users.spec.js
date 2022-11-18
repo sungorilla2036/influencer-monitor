@@ -2,8 +2,8 @@ const { test } = require("@playwright/test");
 const { Client, GatewayIntentBits } = require("discord.js");
 const fs = require("fs");
 
-const configData = fs.readFileSync("./users.json");
-const config = JSON.parse(configData);
+const usersData = fs.readFileSync("./users.json");
+const users = JSON.parse(usersData);
 
 const videosData = fs.readFileSync("./videos.json");
 const videos = JSON.parse(videosData);
@@ -23,22 +23,20 @@ test.beforeAll(async () => {
   console.log("Logged into Discord!");
 });
 
-for (const [username, user] of Object.entries(config["users"])) {
-  const lastProcessedVideoId = user.lastProcessedVideo;
+for (const username of Object.keys(users)) {
   if (!videos[username]) {
     videos[username] = {};
   }
-  const userVideos = videos[username];
   test("Get new videos for user: " + username, async ({ page }) => {
     await page.goto("https://www.tiktok.com/@" + username);
 
     await page.locator("[data-e2e=followers-count]").waitFor();
     const followerCount = await page.$("[data-e2e=followers-count]");
-    user.followers = await followerCount.innerText();
+    users[username].followers = await followerCount.innerText();
 
     await page.locator("[data-e2e=likes-count]").waitFor();
     const likeCount = await page.$("[data-e2e=likes-count]");
-    user.likes = await likeCount.innerText();
+    users[username].likes = await likeCount.innerText();
 
     await page
       .locator("[data-e2e=user-post-item]")
@@ -55,31 +53,31 @@ for (const [username, user] of Object.entries(config["users"])) {
       if (!newestVideoId) {
         newestVideoId = videoId;
       }
-      // if (videoId === lastProcessedVideoId) {
-      //   console.log("No more new videos for user: " + username);
-      //   break;
-      // }
-      if (userVideos[videoId]) {
-        console.log("Video already processed: " + videoId);
-        continue;
+      if (videoId === users[username].lastProcessedVideo) {
+        console.log("No more new videos for user: " + username);
+        //break;
       }
       console.log("Processing video: " + videoId);
       const videoViews = await videoItem.$("[data-e2e=video-views]");
       const views = await videoViews.innerText();
-      userVideos[videoId] = { views: parseInt(views) };
+
+      if (!videos[username][videoId]) {
+        videos[username][videoId] = {};
+      }
+      videos[username][videoId].views = views;
       await CHANNEL.send(
-        `User: ${username} | Followers: ${user.followers} | Likes: ${user.likes}\nViews: ${views} | Video: ${url}`
+        `User: ${username} | Followers: ${users[username].followers} | Likes: ${users[username].likes}\nViews: ${views} | Video: ${url}`
       );
     }
 
     if (newestVideoId) {
-      user.lastProcessedVideo = newestVideoId;
+      users[username].lastProcessedVideo = newestVideoId;
     }
   });
 }
 
 test.afterAll(async () => {
-  fs.writeFileSync("./users.json", JSON.stringify(config));
+  client.destroy();
+  fs.writeFileSync("./users.json", JSON.stringify(users));
   fs.writeFileSync("./videos.json", JSON.stringify(videos));
-  await client.destroy();
 });
