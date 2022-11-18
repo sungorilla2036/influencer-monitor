@@ -1,0 +1,23 @@
+{
+  "name": "tiktok-alerts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrqianhuzi/tiktok-alerts.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mrqianhuzi/tiktok-alerts/issues"
+  },
+  "homepage": "https://github.com/mrqianhuzi/tiktok-alerts#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.28.0"
+  },
+  "dependencies": {
+    "discord.js": "^14.6.0"
+  }
+}
