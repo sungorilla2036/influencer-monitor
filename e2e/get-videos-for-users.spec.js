@@ -20,13 +20,13 @@ let CHANNEL;
  */
 function parseNumberString(str) {
   const lastCharactor = str[str.length - 1];
-  str = str.slice(0, -1);
+  const strShortened = str.slice(0, -1);
   if (lastCharactor === "K") {
-    return parseFloat(str) * 1000;
+    return parseFloat(strShortened) * 1000;
   } else if (lastCharactor === "M") {
-    return parseFloat(str) * 1000000;
+    return parseFloat(strShortened) * 1000000;
   } else if (lastCharactor === "B") {
-    return parseFloat(str) * 1000000000;
+    return parseFloat(strShortened) * 1000000000;
   } else {
     return parseInt(str);
   }
