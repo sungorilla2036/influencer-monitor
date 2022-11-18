@@ -22,11 +22,11 @@ function parseNumberString(str) {
   const lastCharactor = str[str.length - 1];
   str = str.slice(0, -1);
   if (lastCharactor === "K") {
-    return parseInt(str) * 1000;
+    return parseFloat(str) * 1000;
   } else if (lastCharactor === "M") {
-    return parseInt(str) * 1000000;
+    return parseFloat(str) * 1000000;
   } else if (lastCharactor === "B") {
-    return parseInt(str) * 1000000000;
+    return parseFloat(str) * 1000000000;
   } else {
     return parseInt(str);
   }
