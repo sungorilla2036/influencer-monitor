@@ -53,18 +53,18 @@ for (const username of Object.keys(users)) {
       if (!newestVideoId) {
         newestVideoId = videoId;
       }
-      if (videos[username][videoId]) {
-        console.log("Video is not new: " + videoId);
-        continue;
-      } else {
-        videos[username][videoId] = {};
-      }
-      console.log("Processing video: " + videoId);
-
+      
       const videoViews = await videoItem.$("[data-e2e=video-views]");
       const views = await videoViews.innerText();
-      videos[username][videoId].views = views;
- 
+      if (videos[username][videoId]) {
+        console.log("Video is not new: " + videoId);
+        videos[username][videoId].views = views;
+        continue;
+      } else {
+        videos[username][videoId] = {views: views};
+      }
+      console.log("Posting new video: " + videoId);
+
       await CHANNEL.send(
         `User: ${username} | Followers: ${users[username].followers} | Likes: ${users[username].likes}\nViews: ${views} | Video: ${url}`
       );
