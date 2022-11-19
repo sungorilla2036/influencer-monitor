@@ -1,6 +1,7 @@
 const { test } = require("@playwright/test");
 const { Client, GatewayIntentBits } = require("discord.js");
 const fs = require("fs");
+import fetch from "node-fetch";
 
 const usersData = fs.readFileSync("./users.json");
 const users = JSON.parse(usersData);
@@ -8,7 +9,13 @@ const users = JSON.parse(usersData);
 const videosData = fs.readFileSync("./videos.json");
 const videos = JSON.parse(videosData);
 
-const { DISCORD_TOKEN, VIDEO_CHANNEL_ID } = process.env;
+const {
+  DISCORD_TOKEN,
+  VIDEO_CHANNEL_ID,
+  GRAFANA_CLOUD_ID,
+  GRAFANA_API_KEY,
+  INFLUX_METRICS_URL,
+} = process.env;
 
 const client = new Client({ intents: [GatewayIntentBits.GuildMessages] });
 let CHANNEL;
@@ -30,6 +37,33 @@ function parseNumberString(str) {
   } else {
     return parseInt(str);
   }
+}
+
+async function pushInfluxMetrics(metrics) {
+  let metricStrings = [];
+  for (const metric of metrics) {
+    // format: metric,tag1=value1,tag2=value2 field1=value1,field2=value2
+    let metricString = metric.name + ",";
+    for (const tag of metric.tags) {
+      metricString += tag.name + "=" + tag.value + ",";
+    }
+    metricString = metricString.slice(0, -1);
+    metricString += " ";
+    for (const field of metric.fields) {
+      metricString += field.name + "=" + field.value + ",";
+    }
+    metricString = metricString.slice(0, -1);
+    metricStrings.push(metricString);
+  }
+  const response = await fetch(INFLUX_METRICS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${GRAFANA_CLOUD_ID}:${GRAFANA_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(metricStrings.join("\n")),
+  });
+  return response;
 }
 
 test.beforeAll(async () => {
@@ -58,6 +92,21 @@ for (const username of Object.keys(users)) {
     await page.locator("[data-e2e=likes-count]").waitFor();
     const likeCount = await page.$("[data-e2e=likes-count]");
     users[username].likes = parseNumberString(await likeCount.innerText());
+
+    await pushInfluxMetrics([
+      {
+        name: "user",
+        tags: [
+          { name: "user", value: username },
+          { name: "platform", value: "tiktok" },
+          { name: "source", value: "influencer-monitor" },
+        ],
+        fields: [
+          { name: "followers", value: users[username].followers },
+          { name: "likes", value: users[username].likes },
+        ],
+      },
+    ]);
 
     await page
       .locator("[data-e2e=user-post-item]")

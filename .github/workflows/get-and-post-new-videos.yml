@@ -3,39 +3,42 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # run once every day
+    - cron: "0 0 * * *" # run once every day
 jobs:
   get-new-videos:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-node@v3
-      with:
-        node-version: 16
-    - uses: actions/cache@v2
-      id: playwright-cache
-      with:
-        path: |
-          ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
-    - run: npm ci
-    - run: npx playwright install --with-deps
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
-    - run: npx playwright install-deps
-      if: steps.playwright-cache.outputs.cache-hit == 'true'
-    - name: Get new videos
-      continue-on-error: true
-      env:
-        DISCORD_TOKEN: ${{secrets.DISCORD_TOKEN}}
-        VIDEO_CHANNEL_ID: ${{secrets.VIDEO_CHANNEL_ID}}
-      run: npx playwright test get-videos-for-users.spec.js
-    - name: Add and commit changes to users.json and videos.json
-      continue-on-error: true
-      run: |
-        git config user.name github-actions
-        git config user.email github-actions@github.com
-        git add users.json
-        git add videos.json
-        git commit -m "Update data"
-        git push
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - uses: actions/cache@v2
+        id: playwright-cache
+        with:
+          path: |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+      - run: npm ci
+      - run: npx playwright install --with-deps
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: npx playwright install-deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+      - name: Get new videos
+        continue-on-error: true
+        env:
+          DISCORD_TOKEN: ${{secrets.DISCORD_TOKEN}}
+          VIDEO_CHANNEL_ID: ${{secrets.VIDEO_CHANNEL_ID}}
+          GRAFANA_CLOUD_ID: ${{secrets.GRAFANA_CLOUD_ID}}
+          GRAFANA_API_KEY: ${{secrets.GRAFANA_API_KEY}}
+          INFLUX_METRICS_URL: ${{secrets.INFLUX_METRICS_URL}}
+        run: npx playwright test get-videos-for-users.spec.js
+      - name: Add and commit changes to users.json and videos.json
+        continue-on-error: true
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add users.json
+          git add videos.json
+          git commit -m "Update data"
+          git push
