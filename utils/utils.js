@@ -20,7 +20,7 @@ export function parseNumberString(str) {
 }
 
 /**
- * Expected metric format: { name: "metric-name", tags: [{ name: "tag-name", value: "tag-value" }], fields: [{ name: "field-name", value: "field-value" }] }
+ * Expected metric format: { name: "metric-name", tags: [{ name: "tag-name", value: "tag-value" }], fields: [{ name: "field-name", value: "field-value" }, timestamp?: 1661369405000000000] }
  * @param {any[]} metrics
  * @returns
  */
@@ -39,7 +39,12 @@ export async function pushInfluxMetrics(
     const fieldString = metric.fields
       .map((field) => `${field.name}=${field.value}`)
       .join(",");
-    metricStrings.push(`${metric.name},${tagString} ${fieldString}`);
+    const metricString = `${metric.name},${tagString} ${fieldString}`;
+    if (metric.timestamp) {
+      metricStrings.push(`${metricString} ${metric.timestamp}`);
+    } else {
+      metricStrings.push(metricString);
+    }
   }
 
   console.log("Pushing metrics to InfluxDB: " + metricStrings.join("\n"));

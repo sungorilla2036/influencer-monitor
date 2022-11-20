@@ -13,6 +13,8 @@ const videos = JSON.parse(videosData);
 
 const { GRAFANA_CLOUD_ID, GRAFANA_API_KEY, INFLUX_METRICS_URL } = process.env;
 
+const TIMESTAMP = Date.now() * 1000000;
+
 /**
  * @param {string} username
  * @param {any} video
@@ -50,6 +52,7 @@ async function processVideo(username, video, videoId, APPSTATE) {
             { name: "comments", value: video.comments },
             { name: "shares", value: video.shares },
           ],
+          timestamp: TIMESTAMP,
         },
       ],
       INFLUX_METRICS_URL,
@@ -95,6 +98,7 @@ for (const username of Object.keys(videos)) {
               { name: "likes", value: heartCount },
               { name: "posts", value: videoCount },
             ],
+            timestamp: TIMESTAMP,
           },
         ],
         INFLUX_METRICS_URL,
