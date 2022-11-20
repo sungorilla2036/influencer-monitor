@@ -37,5 +37,6 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add videos.json
+          git add users.json
           git commit -m "Update video data"
           git push
