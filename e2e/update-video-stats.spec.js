@@ -28,37 +28,10 @@ async function processVideo(username, video, videoId, APPSTATE) {
     video.likes = APPSTATE.ItemModule[videoId].stats.diggCount;
     video.comments = APPSTATE.ItemModule[videoId].stats.commentCount;
     video.shares = APPSTATE.ItemModule[videoId].stats.shareCount;
-    const isAd = APPSTATE.ItemModule[videoId].isAd ? 1 : 0;
     const duetId = APPSTATE.ItemModule[videoId].duetInfo.duetFromId;
     if (duetId != "0") {
       video.duetId = duetId;
     }
-    await pushInfluxMetrics(
-      [
-        {
-          name: "video",
-          tags: [
-            { name: "user", value: username },
-            { name: "platform", value: "tiktok" },
-            { name: "source", value: "influencer-monitor" },
-            { name: "is_ad", value: isAd },
-            { name: "is_duet", value: duetId != "0" ? 1 : 0 },
-            { name: "video_id", value: "NA" },
-            { name: "group", value: "default" },
-          ],
-          fields: [
-            { name: "views", value: video.views },
-            { name: "likes", value: video.likes },
-            { name: "comments", value: video.comments },
-            { name: "shares", value: video.shares },
-          ],
-          timestamp: TIMESTAMP,
-        },
-      ],
-      INFLUX_METRICS_URL,
-      GRAFANA_CLOUD_ID,
-      GRAFANA_API_KEY
-    );
   } else {
     console.log("No APPSTATE found for video: " + videoId);
   }
@@ -70,7 +43,7 @@ for (const username of Object.keys(videos)) {
 
     await page.goto(`https://www.tiktok.com/@${username}`);
     await page
-      .locator("[data-e2e=user-post-item]")
+      .locator("[data-e2e=likes-count]")
       .last()
       .waitFor({ timeout: 15000 });
     // @ts-ignore
@@ -106,6 +79,13 @@ for (const username of Object.keys(videos)) {
         GRAFANA_API_KEY
       );
 
+      await page
+        .locator("[data-e2e=user-post-item]")
+        .last()
+        .waitFor({ timeout: 15000 });
+      // @ts-ignore
+      APPSTATE = await page.evaluate(() => window.SIGI_STATE);
+      const userVideos = [];
       for (const videoId of Object.keys(APPSTATE.ItemModule)) {
         if (!processedVideos.has(videoId)) {
           await processVideo(
@@ -115,6 +95,65 @@ for (const username of Object.keys(videos)) {
             APPSTATE
           );
           processedVideos.add(videoId);
+          userVideos.push(videos[username][videoId]);
+        }
+      }
+
+      for (let isDuet = 0; isDuet < 2; isDuet++) {
+        const filteredVideos = userVideos.filter((video) =>
+          isDuet ? video.duetId !== "0" : video.duetId === "0"
+        );
+        if (filteredVideos.length > 0) {
+          await pushInfluxMetrics(
+            [
+              {
+                name: "video",
+                tags: [
+                  { name: "user", value: username },
+                  { name: "platform", value: "tiktok" },
+                  { name: "source", value: "influencer-monitor" },
+                  { name: "is_ad", value: 0 },
+                  { name: "is_duet", value: isDuet },
+                  { name: "video_id", value: "NA" },
+                  { name: "group", value: "default" },
+                ],
+                fields: [
+                  {
+                    name: "views",
+                    value: filteredVideos.reduce(
+                      (acc, video) => acc + video.views,
+                      0
+                    ),
+                  },
+                  {
+                    name: "likes",
+                    value: filteredVideos.reduce(
+                      (acc, video) => acc + video.likes,
+                      0
+                    ),
+                  },
+                  {
+                    name: "comments",
+                    value: filteredVideos.reduce(
+                      (acc, video) => acc + video.comments,
+                      0
+                    ),
+                  },
+                  {
+                    name: "shares",
+                    value: filteredVideos.reduce(
+                      (acc, video) => acc + video.shares,
+                      0
+                    ),
+                  },
+                ],
+                timestamp: TIMESTAMP,
+              },
+            ],
+            INFLUX_METRICS_URL,
+            GRAFANA_CLOUD_ID,
+            GRAFANA_API_KEY
+          );
         }
       }
     } else {
