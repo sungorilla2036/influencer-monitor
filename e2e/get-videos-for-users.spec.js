@@ -1,21 +1,17 @@
+// @ts-check
 const { test } = require("@playwright/test");
 const { Client, GatewayIntentBits } = require("discord.js");
 const fs = require("fs");
-import { parseNumberString, pushInfluxMetrics } from "../utils/utils";
 
 const usersData = fs.readFileSync("./users.json");
+// @ts-ignore
 const users = JSON.parse(usersData);
 
 const videosData = fs.readFileSync("./videos.json");
+// @ts-ignore
 const videos = JSON.parse(videosData);
 
-const {
-  DISCORD_TOKEN,
-  VIDEO_CHANNEL_ID,
-  GRAFANA_CLOUD_ID,
-  GRAFANA_API_KEY,
-  INFLUX_METRICS_URL,
-} = process.env;
+const { DISCORD_TOKEN, VIDEO_CHANNEL_ID } = process.env;
 
 const client = new Client({ intents: [GatewayIntentBits.GuildMessages] });
 let CHANNEL;
@@ -26,6 +22,7 @@ test.beforeAll(async () => {
   await new Promise((resolve) => {
     client.once("ready", resolve);
   });
+  // @ts-ignore
   CHANNEL = await client.channels.fetch(VIDEO_CHANNEL_ID);
   console.log("Logged into Discord!");
 });
@@ -37,84 +34,54 @@ for (const username of Object.keys(users)) {
   test("Get new videos for user: " + username, async ({ page }) => {
     await page.goto("https://www.tiktok.com/@" + username);
 
-    await page.locator("[data-e2e=followers-count]").waitFor();
-    const followerCount = await page.$("[data-e2e=followers-count]");
-    users[username].followers = parseNumberString(
-      await followerCount.innerText()
-    );
-
-    await page.locator("[data-e2e=likes-count]").waitFor();
-    const likeCount = await page.$("[data-e2e=likes-count]");
-    users[username].likes = parseNumberString(await likeCount.innerText());
-
-    const userMetric = {
-      name: "user",
-      tags: [
-        { name: "user", value: username },
-        { name: "platform", value: "tiktok" },
-        { name: "source", value: "influencer-monitor" },
-      ],
-      fields: [{ name: "followers", value: users[username].followers }],
-    };
-
-    let APPSTATE = await page.evaluate(() => window.SIGI_STATE);
-    if (APPSTATE) {
-      users[username].videos = APPSTATE.UserModule.stats[username].videoCount;
-      userMetric.fields.push({
-        name: "videos",
-        value: users[username].videos,
-      });
-    } else {
-      console.log("No APPSTATE found for user " + username);
-    }
-    await pushInfluxMetrics(
-      [userMetric],
-      INFLUX_METRICS_URL,
-      GRAFANA_CLOUD_ID,
-      GRAFANA_API_KEY
-    );
-
+    let error = false;
     await page
       .locator("[data-e2e=user-post-item]")
       .last()
-      .waitFor({ timeout: 15000 });
-    const videoItemList = await page.$("[data-e2e=user-post-item-list]");
-    const videoItems = await videoItemList.$$("[data-e2e=user-post-item]");
+      .waitFor({ timeout: 15000 })
+      .catch((err) => {
+        console.log("Video not found for user: " + username);
+        error = true;
+      });
 
-    let newestVideoId;
-
-    for (const videoItem of videoItems) {
-      const videoUrl = await videoItem.$("a");
-      const url = await videoUrl.getAttribute("href");
-      const videoId = url.split("/video/")[1];
-      if (!newestVideoId) {
-        newestVideoId = videoId;
-      }
-
-      const videoViews = await videoItem.$("[data-e2e=video-views]");
-      const views = parseNumberString(await videoViews.innerText());
-      if (videos[username][videoId]) {
-        console.log("Video is not new: " + videoId);
-        videos[username][videoId].views = views;
-        continue;
-      } else {
-        videos[username][videoId] = { views: views };
-      }
-      console.log("Posting new video: " + videoId);
-
-      await CHANNEL.send(
-        `User: ${username} | Followers: ${users[username].followers} | Likes: ${users[username].likes}\nViews: ${views} | Video: ${url}`
-      );
+    if (error) {
+      return;
     }
 
-    if (newestVideoId) {
-      users[username].lastProcessedVideo = newestVideoId;
+    // @ts-ignore
+    let APPSTATE = await page.evaluate(() => window.SIGI_STATE);
+
+    if (APPSTATE) {
+      for (const videoItem of Object.values(APPSTATE.ItemModule)) {
+        const authorStats = videoItem.authorStats;
+        const videoStats = videoItem.stats;
+        const videoId = videoItem.id;
+        const videoUrl = `https://www.tiktok.com/@${username}/video/${videoId}`;
+
+        if (videos[username][videoId]) {
+          console.log("Video is not new: " + videoId);
+          continue;
+        }
+        videos[username][videoId] = {
+          createTime: parseInt(videoItem.createTime),
+          views: videoStats.playCount,
+          likes: videoStats.diggCount,
+          comments: videoStats.commentCount,
+          shares: videoStats.shareCount,
+        };
+
+        console.log("Posting new video: " + videoId);
+        await CHANNEL.send(
+          `User: ${username} | Followers: ${authorStats.followerCount} | Likes: ${authorStats.heartCount}\nViews: ${videoStats.playCount} | Comments: ${videoStats.commentCount} | Likes: ${videoStats.diggCount} | Shares: ${videoStats.shareCount} | Video: ${videoUrl}`
+        );
+      }
+    } else {
+      console.log("No APPSTATE found for user: " + username);
     }
   });
 }
 
 test.afterAll(async () => {
   client.destroy();
-  fs.writeFileSync("./users.json", JSON.stringify(users));
   fs.writeFileSync("./videos.json", JSON.stringify(videos));
 });

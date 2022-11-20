@@ -21,7 +21,7 @@ export function parseNumberString(str) {
 
 /**
  * Expected metric format: { name: "metric-name", tags: [{ name: "tag-name", value: "tag-value" }], fields: [{ name: "field-name", value: "field-value" }] }
- * @param {[]} metrics
+ * @param {any[]} metrics
  * @returns
  */
 export async function pushInfluxMetrics(
@@ -47,9 +47,9 @@ export async function pushInfluxMetrics(
     method: "POST",
     headers: {
       Authorization: `Bearer ${grafanaCloudId}:${grafanaCloudAPIKey}`,
-      "Content-Type": "application/json",
+      "Content-Type": "text/plain",
     },
-    body: JSON.stringify(metricStrings.join("\n")),
+    body: metricStrings.join("\n"),
   }).catch((err) => {
     console.log(err);
   });
